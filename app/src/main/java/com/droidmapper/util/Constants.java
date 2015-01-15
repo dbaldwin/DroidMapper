@@ -12,8 +12,8 @@ public final class Constants {
     public static final Session.AccessType ACCESS_TYPE = Session.AccessType.APP_FOLDER;
 
     // Dropbox credentials:
-    public static final String APP_SECRET = "iwfdykrdak6qfuy";
-    public static final String APP_KEY = "klrvs3j75xo2erh";
+    public static final String APP_SECRET = "INSERT_APP_SECRET";
+    public static final String APP_KEY = "INSERT_APP_KEY";
 
     /**
      * Private constructor prevents instantiation of this class.
