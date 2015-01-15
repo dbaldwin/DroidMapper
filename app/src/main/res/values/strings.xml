@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">DroidMapper</string>
+
+    <string name="action_settings">Settings</string>
+
+    <!-- Strings used in the MainActivity: -->
+    <string name="activityMain_photoInterval">Interval:</string>
+    <string name="activityMain_photoDelay">Delay:</string>
+    <string name="activityMain_photoSize">Scale photo to:</string>
+    <string name="activityMain_start">Start</string>
+
+    <!-- Strings used in the CameraActivity: -->
+    <string name="activityCamera_stop">Stop</string>
+
+    <!-- Strings used in the PhotoProcessorThread: -->
+    <string name="ppThread_photo_description">A photo taken by Photo Timer</string>
+
+</resources>
