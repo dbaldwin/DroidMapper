@@ -4,7 +4,7 @@
     android:layout_height="match_parent"
     tools:context="com.droidmapper.CameraActivity">
 
-    <com.droidplanner.view.CameraView
+    <com.droidmapper.view.CameraView
         android:id="@+id/activityCamera_cameraView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
