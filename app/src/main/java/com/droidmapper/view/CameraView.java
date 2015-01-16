@@ -136,12 +136,12 @@ public class CameraView extends SurfaceView implements SurfaceHolder.Callback {
             if (previewSize != null && pictureSize != null) {
                 // Pick the best available flash mode:
                 String flashMode = Camera.Parameters.FLASH_MODE_OFF;
-                for (String mode : parameters.getSupportedFlashModes()) {
+                /*for (String mode : parameters.getSupportedFlashModes()) {
                     if (mode.equalsIgnoreCase(Camera.Parameters.FLASH_MODE_AUTO)) {
                         flashMode = Camera.Parameters.FLASH_MODE_AUTO;
                         break;
                     }
-                }
+                }*/
 
                 // Pick the best FPS range(mix and max number of preview frames sent to the screen
                 // each second:
@@ -161,7 +161,11 @@ public class CameraView extends SurfaceView implements SurfaceHolder.Callback {
                 if (parameters.isZoomSupported()) {
                     parameters.setZoom(0);
                 }
-                camera.setParameters(parameters);
+                try {
+                    camera.setParameters(parameters);
+                } catch (Exception e) {
+                    Log.d(TAG, "camera.setParameters() exception: " + e.toString());
+                }
             }
 
             camera.startPreview();
