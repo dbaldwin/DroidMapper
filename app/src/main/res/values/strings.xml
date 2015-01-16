@@ -15,6 +15,6 @@
     <string name="activityCamera_stop">Stop</string>
 
     <!-- Strings used in the PhotoProcessorThread: -->
-    <string name="ppThread_photo_description">A photo taken by Photo Timer</string>
+    <string name="ppThread_photo_description">A photo taken by DroidMapper</string>
 
 </resources>
