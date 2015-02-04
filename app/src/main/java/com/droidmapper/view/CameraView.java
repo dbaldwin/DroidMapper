@@ -189,14 +189,6 @@ public class CameraView extends SurfaceView implements SurfaceHolder.Callback {
             }
 
             if (previewSize != null && pictureSize != null) {
-                // Pick the best available flash mode:
-                String flashMode = Camera.Parameters.FLASH_MODE_OFF;
-                /*for (String mode : parameters.getSupportedFlashModes()) {
-                    if (mode.equalsIgnoreCase(Camera.Parameters.FLASH_MODE_AUTO)) {
-                        flashMode = Camera.Parameters.FLASH_MODE_AUTO;
-                        break;
-                    }
-                }*/
 
                 // Pick the best FPS range(mix and max number of preview frames sent to the screen
                 // each second:
@@ -207,9 +199,9 @@ public class CameraView extends SurfaceView implements SurfaceHolder.Callback {
                 parameters.setPictureSize(pictureSize.width, pictureSize.height);
                 parameters.setPreviewFormat(ImageFormat.NV21);
                 parameters.setPictureFormat(ImageFormat.JPEG);
-                parameters.setFlashMode(flashMode);
-                parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
-                parameters.setWhiteBalance(Camera.Parameters.WHITE_BALANCE_AUTO);
+                parameters.setFlashMode(Camera.Parameters.FLASH_MODE_OFF);
+                parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_INFINITY);
+                parameters.setWhiteBalance(Camera.Parameters.WHITE_BALANCE_DAYLIGHT);
                 parameters.setSceneMode(Camera.Parameters.SCENE_MODE_AUTO);
                 parameters.setColorEffect(Camera.Parameters.EFFECT_NONE);
                 parameters.setPreviewFpsRange(previewBestFpsRange[Camera.Parameters.PREVIEW_FPS_MIN_INDEX], previewBestFpsRange[Camera.Parameters.PREVIEW_FPS_MAX_INDEX]);
