@@ -56,7 +56,7 @@ public class CameraActivity extends Activity {
 
     // Dropbox API:
     private DropboxAPI<AndroidAuthSession> dropboxApi;
-    private String dbOauth2AccessToekn;
+    private String dbOauth2AccessToken;
 
     // Util threads:
     private PhotoProcessorThread photoProcsThread;
@@ -72,6 +72,7 @@ public class CameraActivity extends Activity {
     private int interval, delay;
     private Handler handler;
     private float size;
+    private int photoCount;
 
     // TODO: Note that currently util threads, after receiving stop command, stop immediately, they do not finish queued tasks.
     // TODO: If this is unwanted, because the app might/will lose a few photos, they should be modified to first finish queued tasks and then exit.
@@ -100,11 +101,14 @@ public class CameraActivity extends Activity {
         } else if (!intent.hasExtra(EXTRA_SIZE)) {
             throw new IllegalArgumentException("EXTRA_SIZE was not found in the intent that started this activity!");
         } else {
-            dbOauth2AccessToekn = intent.getStringExtra(EXTRA_DB_OAUTH2_ACCESS_TOKEN);
+            dbOauth2AccessToken = intent.getStringExtra(EXTRA_DB_OAUTH2_ACCESS_TOKEN);
             interval = intent.getIntExtra(EXTRA_INTERVAL, -1);
             delay = intent.getIntExtra(EXTRA_DELAY, -1);
             size = intent.getFloatExtra(EXTRA_SIZE, 0F);
         }
+
+        // Count the number of photos taken
+        photoCount = 0;
 
         // Inflates the GUI defined in the XML file:
         setContentView(R.layout.activity_camera);
@@ -129,7 +133,7 @@ public class CameraActivity extends Activity {
 
         // Initialize the Dropbox API:
         AppKeyPair appKeys = new AppKeyPair(Constants.APP_KEY, Constants.APP_SECRET);
-        AndroidAuthSession session = new AndroidAuthSession(appKeys, dbOauth2AccessToekn);
+        AndroidAuthSession session = new AndroidAuthSession(appKeys, dbOauth2AccessToken);
         dropboxApi = new DropboxAPI<AndroidAuthSession>(session);
 
         // Create(if it does not exist) and initialize the directory in which the images will be saved:
@@ -144,7 +148,7 @@ public class CameraActivity extends Activity {
         dateFormat = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss_SSS");
 
         // We need to listen for device orientation changes in order to know when it is held in
-        // portrait and when in landscape so that we could properly rotate the captured photos:
+        // portrait and when in landscape so that we can properly rotate the captured photos:
         orientationListener = new OrientationEventListener(this) {
 
             @Override
