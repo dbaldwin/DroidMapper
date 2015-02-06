@@ -17,6 +17,7 @@ import android.view.OrientationEventListener;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.Toast;
 
 import com.dropbox.client2.DropboxAPI;
 import com.dropbox.client2.android.AndroidAuthSession;
@@ -350,6 +351,7 @@ public class CameraActivity extends Activity {
             // Add the saved photo to the device gallery:
             try {
                 MediaStore.Images.Media.insertImage(getContentResolver(), filePath, filename, getString(R.string.ppThread_photo_description));
+                Toast.makeText(getApplicationContext(), "Photo " + Integer.toString(photoCount++) + " saved", Toast.LENGTH_LONG).show();
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             }
