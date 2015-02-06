@@ -11,10 +11,6 @@ import android.view.SurfaceView;
 import android.widget.Toast;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
 
 /**
  * A view that invokes the camera, renders its preview in the best possible resolution and provides
@@ -36,7 +32,7 @@ public class CameraView extends SurfaceView implements SurfaceHolder.Callback {
      */
     public CameraView(Context context) {
         super(context);
-        intitialize();
+        initialize();
     }
 
     /**
@@ -52,7 +48,7 @@ public class CameraView extends SurfaceView implements SurfaceHolder.Callback {
      */
     public CameraView(Context context, AttributeSet attrs) {
         super(context, attrs);
-        intitialize();
+        initialize();
     }
 
     /**
@@ -70,7 +66,7 @@ public class CameraView extends SurfaceView implements SurfaceHolder.Callback {
      */
     public CameraView(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
-        intitialize();
+        initialize();
     }
 
     /**
@@ -213,7 +209,7 @@ public class CameraView extends SurfaceView implements SurfaceHolder.Callback {
     /**
      * Helper method used by class constructors to initialize the preview holder and open the camera.
      */
-    private void intitialize() {
+    private void initialize() {
         if (!isInEditMode()) {
             // Initialize preview holder:
             previewHolder = getHolder();
