@@ -11,6 +11,10 @@ import android.view.SurfaceView;
 import android.widget.Toast;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 
 /**
  * A view that invokes the camera, renders its preview in the best possible resolution and provides
@@ -104,6 +108,68 @@ public class CameraView extends SurfaceView implements SurfaceHolder.Callback {
         if (camera != null) {
             Camera.Parameters parameters = camera.getParameters();
 
+            // Camera supports a fixed set of preview sizes(resolution of the video stream sent to
+            // the screen to be viewed by the user), figure out the optimal for the local device:
+            List<Camera.Size> prevSizes = new ArrayList<>(parameters.getSupportedPreviewSizes());
+            // Print all resolutions:
+            for (int i = 0; i < prevSizes.size(); i++) {
+                Camera.Size sz = prevSizes.get(i);
+                Log.d(TAG, "surfaceChanged() :: Preview size [" + i + "] = " + sz.width + "x" + sz.height);
+            }
+            // Remove all portrait sizes:
+            for (int i = 0; i < prevSizes.size(); i++) {
+                Camera.Size sz = prevSizes.get(i);
+                if (sz.width < sz.height) {
+                    Log.d(TAG, "surfaceChanged() :: Removing #1 " + sz.width + "x" + sz.height);
+                    prevSizes.remove(i);
+                    i--;
+                }
+            }
+//            // Remove all sizes which are less than 1/2 of the view width:
+//            int vwhlf = width / 2;
+//            for (int i = 0; i < prevSizes.size(); i++) {
+//                Camera.Size sz = prevSizes.get(i);
+//                if (sz.width <= vwhlf) {
+//                    Log.d(TAG, "surfaceChanged() :: Removing #2 " + sz.width + "x" + sz.height);
+//                    prevSizes.remove(i);
+//                    i--;
+//                }
+//            }
+            // Sort the sizes according to their width ASC:
+            Collections.sort(prevSizes, new Comparator<Camera.Size>() {
+
+                @Override
+                public int compare(Camera.Size lhs, Camera.Size rhs) {
+                    if(lhs.width < rhs.width){
+                        return -1;
+                    } else if(lhs.width > rhs.width){
+                        return 1;
+                    }
+                    return 0;
+                }
+            });
+            // Print all resolutions after sorting:
+            for (int i = 0; i < prevSizes.size(); i++) {
+                Camera.Size sz = prevSizes.get(i);
+                Log.d(TAG, "surfaceChanged() :: After sorting preview size [" + i + "] = " + sz.width + "x" + sz.height);
+            }
+//            // Pick the best resolution:
+//            Camera.Size previewSize = null;
+//            float targetRatio = ((float) width) / ((float) height);
+//            for (Camera.Size size : prevSizes) {
+//                if (previewSize == null) {
+//                    previewSize = size;
+//                } else {
+//                    float sizeRatio = Math.abs(((float) size.width) / ((float) size.height));
+//                    if (Math.abs(targetRatio - sizeRatio) <= 0.1f) {
+//                        previewSize = size;
+//                    }
+//                }
+//            }
+            // Pick the smallest resolution:
+            Camera.Size previewSize = prevSizes.get(0);
+            Log.d(TAG, "surfaceChanged() :: Selected preview size is " + previewSize.width + "x" + previewSize.height);
+
             // Camera also supports a fixed set of sizes of pictures that can be taken with the
             // camera, figure out the maximal:
             Camera.Size pictureSize = null;
@@ -117,15 +183,13 @@ public class CameraView extends SurfaceView implements SurfaceHolder.Callback {
                 }
             }
 
-            if (pictureSize != null) {
-
-                // Pick the best FPS range(min and max number of preview frames sent to the screen
+            if (previewSize != null && pictureSize != null) {
+                // Pick the best FPS range(mix and max number of preview frames sent to the screen
                 // each second:
-                //int[] previewBestFpsRange = parameters.getSupportedPreviewFpsRange().get(0);
+                int[] previewBestFpsRange = parameters.getSupportedPreviewFpsRange().get(0);
 
-                // Set the parameters
-                // Set preview size to 640x480 for now since we're not too concerned with previews
-                parameters.setPreviewSize(640, 480);
+                // Set the parameters:
+                parameters.setPreviewSize(previewSize.width, previewSize.height);
                 parameters.setPictureSize(pictureSize.width, pictureSize.height);
                 parameters.setPreviewFormat(ImageFormat.NV21);
                 parameters.setPictureFormat(ImageFormat.JPEG);
@@ -134,16 +198,11 @@ public class CameraView extends SurfaceView implements SurfaceHolder.Callback {
                 parameters.setWhiteBalance(Camera.Parameters.WHITE_BALANCE_DAYLIGHT);
                 parameters.setSceneMode(Camera.Parameters.SCENE_MODE_AUTO);
                 parameters.setColorEffect(Camera.Parameters.EFFECT_NONE);
-                // Lock frame rate to 1 fps for now
-                parameters.setPreviewFpsRange(1, 1);
+                parameters.setPreviewFpsRange(previewBestFpsRange[Camera.Parameters.PREVIEW_FPS_MIN_INDEX], previewBestFpsRange[Camera.Parameters.PREVIEW_FPS_MAX_INDEX]);
                 if (parameters.isZoomSupported()) {
                     parameters.setZoom(0);
                 }
-                try {
-                    camera.setParameters(parameters);
-                } catch (Exception e) {
-                    Log.d(TAG, "camera.setParameters() exception: " + e.toString());
-                }
+                camera.setParameters(parameters);
             }
 
             camera.startPreview();
