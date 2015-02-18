@@ -13,6 +13,7 @@ import android.os.Bundle;
  * Provides a way for the application to get the current device location. The location is retrieved
  * from GPS, NETWORK and PASIVE providers.
  */
+@Deprecated
 public class LocationProvider {
 
     private static final String TAG = LocationProvider.class.getName();
