@@ -6,9 +6,12 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.os.Environment;
+import android.os.SystemClock;
 import android.provider.MediaStore;
+import android.text.Html;
 import android.util.Log;
 
+import com.droidmapper.CameraActivity;
 import com.droidmapper.R;
 
 import java.io.ByteArrayOutputStream;
@@ -38,6 +41,7 @@ public class PhotoProcessorThread extends Thread {
     private final SimpleDateFormat dateFormat;
     private final String imgDescriptionTxt;
     private final Vector<JobStruct> queue;
+    private final CameraActivity activity;
     private final File mediaStorageDir;
     private final Object lock;
 
@@ -45,18 +49,19 @@ public class PhotoProcessorThread extends Thread {
      * Default constructor. It creates an instance of this class using the Context supplied as
      * parameter.
      *
-     * @param context       The Context this class is running in, through which it can
+     * @param activity      The CameraActivity this class is running in, through which it can
      *                      access the current theme, resources, etc.
      * @param dbUpldrThread The Dropbox uploader thread that should upload to Dropbox all the photos
      *                      saved by this thread.
      */
-    public PhotoProcessorThread(Context context, DropboxUploaderThread dbUpldrThread) {
-        if (context == null) {
-            throw new NullPointerException("Context param can't be null.");
+    public PhotoProcessorThread(CameraActivity activity, DropboxUploaderThread dbUpldrThread) {
+        if (activity == null) {
+            throw new NullPointerException("Activity param can't be null.");
         }
         if (dbUpldrThread == null) {
             throw new NullPointerException("DropboxUploaderThread param can't be null.");
         }
+        this.activity = activity;
         this.dbUpldrThread = dbUpldrThread;
 
         // Create queue that will buffer taken photos:
@@ -69,14 +74,14 @@ public class PhotoProcessorThread extends Thread {
         halt = false;
 
         // ContentResolver used to add the captured photos to the device gallery:
-        contentResolver = context.getContentResolver();
+        contentResolver = activity.getContentResolver();
 
         // Description for photos taken by this app, used in device's gallery app:
-        imgDescriptionTxt = context.getString(R.string.ppThread_photo_description);
+        imgDescriptionTxt = activity.getString(R.string.ppThread_photo_description);
 
         // Create(if it does not exist) and initialize the directory in which the images will be saved:
         File picsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
-        mediaStorageDir = new File(picsDir, context.getString(R.string.app_name));
+        mediaStorageDir = new File(picsDir, activity.getString(R.string.app_name));
         if (!mediaStorageDir.exists()) {
             mediaStorageDir.mkdirs();
         }
@@ -161,6 +166,8 @@ public class PhotoProcessorThread extends Thread {
 
                 // Upload the saved photo to Dropbox:
                 dbUpldrThread.queuePhoto(filePath);
+
+                activity.postLastCapturedPhotoFilenameUpdate(filename);
             }
         }
         Log.d(TAG, "run() :: Stop");
