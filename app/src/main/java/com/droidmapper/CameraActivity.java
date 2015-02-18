@@ -1,7 +1,11 @@
 package com.droidmapper;
 
 import android.app.Activity;
+import android.app.Dialog;
+import android.app.DialogFragment;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentSender;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
@@ -12,16 +16,23 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.SystemClock;
 import android.provider.MediaStore;
+import android.text.Html;
 import android.util.Log;
 import android.view.OrientationEventListener;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
-import android.widget.Toast;
+import android.widget.TextView;
 
 import com.dropbox.client2.DropboxAPI;
 import com.dropbox.client2.android.AndroidAuthSession;
 import com.dropbox.client2.session.AppKeyPair;
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GooglePlayServicesUtil;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.location.LocationListener;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationServices;
 import com.droidmapper.util.Constants;
 import com.droidmapper.util.DropboxUploaderThread;
 import com.droidmapper.util.LocationProvider;
@@ -33,6 +44,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
@@ -41,17 +54,30 @@ import java.util.Date;
  * purpose is to take photos with back camera in the specified interval and to send taken photos
  * to the PhotoProcessorThread for further processing.
  */
-public class CameraActivity extends Activity {
+public class CameraActivity extends Activity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
     // Constants used as keys for the extras passed to this activity:
     public static final String EXTRA_DB_OAUTH2_ACCESS_TOKEN = CameraActivity.class.getName() + "EXTRA_DB_OAUTH2_ACCESS_TOKEN";
+    public static final String EXTRA_INTERVAL_TYPE = CameraActivity.class.getName() + "EXTRA_INTERVAL_TYPE";
     public static final String EXTRA_INTERVAL = CameraActivity.class.getName() + "EXTRA_INTERVAL";
     public static final String EXTRA_DELAY = CameraActivity.class.getName() + "EXTRA_DELAY";
     public static final String EXTRA_SIZE = CameraActivity.class.getName() + "EXTRA_SIZE";
 
+    // Interval type constants:
+    public static final int INTERVAL_TYPE_DISTANCE = 1;
+    public static final int INTERVAL_TYPE_TIME = 2;
+
+    // Request code to use when launching the Google Play Services API resolution activity:
+    private static final int REQUEST_RESOLVE_ERROR = 1001;
+    // Unique tag for the Google Play Services API error dialog fragment:
+    private static final String DIALOG_ERROR = "dialog_error";
+    // Key used to preserve the state of the resolvingError field between activity restarts:
+    private static final String STATE_RESOLVING_ERROR = "resolving_error";
+
     private static final String TAG = CameraActivity.class.getName();
 
     // Views:
+    private TextView textViewLat, textViewLong, textViewAlt, textViewSpd, textViewPhoto;
     private CameraView cameraView;
     private Button buttonStop;
 
@@ -63,17 +89,20 @@ public class CameraActivity extends Activity {
     private PhotoProcessorThread photoProcsThread;
     private DropboxUploaderThread dbUpldrThread;
 
+    // Location:
+    private GoogleApiClient googleApiClient;
+    private boolean resolvingError;
+    private Location lastLocation;
+
     // Other:
     private OrientationEventListener orientationListener;
     private volatile long takePicInvocTimestamp;
-    private LocationProvider locationProvider;
+    private int interval, intervalType, delay;
     private int devOrien, devOrienAtCapture;
     private SimpleDateFormat dateFormat;
     private File mediaStorageDir;
-    private int interval, delay;
     private Handler handler;
     private float size;
-    private int photoCount;
 
     // TODO: Note that currently util threads, after receiving stop command, stop immediately, they do not finish queued tasks.
     // TODO: If this is unwanted, because the app might/will lose a few photos, they should be modified to first finish queued tasks and then exit.
@@ -95,6 +124,8 @@ public class CameraActivity extends Activity {
         Intent intent = getIntent();
         if (!intent.hasExtra(EXTRA_DB_OAUTH2_ACCESS_TOKEN)) {
             throw new IllegalArgumentException("EXTRA_DB_OAUTH2_ACCESS_TOKEN was not found in the intent that started this activity!");
+        } else if (!intent.hasExtra(EXTRA_INTERVAL_TYPE)) {
+            throw new IllegalArgumentException("EXTRA_INTERVAL_TYPE was not found in the intent that started this activity!");
         } else if (!intent.hasExtra(EXTRA_INTERVAL)) {
             throw new IllegalArgumentException("EXTRA_INTERVAL was not found in the intent that started this activity!");
         } else if (!intent.hasExtra(EXTRA_DELAY)) {
@@ -103,13 +134,11 @@ public class CameraActivity extends Activity {
             throw new IllegalArgumentException("EXTRA_SIZE was not found in the intent that started this activity!");
         } else {
             dbOauth2AccessToken = intent.getStringExtra(EXTRA_DB_OAUTH2_ACCESS_TOKEN);
+            intervalType = intent.getIntExtra(EXTRA_INTERVAL_TYPE, -1);
             interval = intent.getIntExtra(EXTRA_INTERVAL, -1);
             delay = intent.getIntExtra(EXTRA_DELAY, -1);
             size = intent.getFloatExtra(EXTRA_SIZE, 0F);
         }
-
-        // Count the number of photos taken
-        photoCount = 0;
 
         // Inflates the GUI defined in the XML file:
         setContentView(R.layout.activity_camera);
@@ -118,19 +147,40 @@ public class CameraActivity extends Activity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         // Get references to views defined in the GUI:
+        textViewLat = (TextView) findViewById(R.id.activityCamera_textViewLat);
+        textViewLong = (TextView) findViewById(R.id.activityCamera_textViewLong);
+        textViewAlt = (TextView) findViewById(R.id.activityCamera_textViewAlt);
+        textViewSpd = (TextView) findViewById(R.id.activityCamera_textViewSpd);
+        textViewPhoto = (TextView) findViewById(R.id.activityCamera_textViewPhoto);
         cameraView = (CameraView) findViewById(R.id.activityCamera_cameraView);
         buttonStop = (Button) findViewById(R.id.activityCamera_buttonStop);
 
         // Listen for clicks on the stop button:
         buttonStop.setOnClickListener(onClickListener);
 
+        // Set text view default texts:
+        textViewLat.setText(Html.fromHtml(getString(R.string.activityCamera_textViewLat, "")));
+        textViewLong.setText(Html.fromHtml(getString(R.string.activityCamera_textViewLong, "")));
+        textViewAlt.setText(Html.fromHtml(getString(R.string.activityCamera_textViewAlt, "")));
+        textViewSpd.setText(Html.fromHtml(getString(R.string.activityCamera_textViewSpd, "")));
+        textViewPhoto.setText(Html.fromHtml(getString(R.string.activityCamera_textViewPhoto, "")));
+
         // Initialize the Handler instance. We use it to schedule tasks to run on the GUI thread at
         // some point in future.
         handler = new Handler();
 
-        // Initialize the location provider needed for geo tagging taken photos:
-        locationProvider = new LocationProvider(this);
-        cameraView.setGeoTaggingLocation(locationProvider.getBestLocation());
+        // Connect to Google Play Service in order to use Fused Location Provider to geo-tag taken photos:
+        googleApiClient = new GoogleApiClient.Builder(this)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .addApi(LocationServices.API)
+                .build();
+        cameraView.setGeoTaggingLocation(lastLocation);
+
+        // Restore the state of the resolvingError variable after activity restart:
+        if (savedInstanceState != null) {
+            resolvingError = savedInstanceState.getBoolean(STATE_RESOLVING_ERROR, false);
+        }
 
         // Initialize the Dropbox API:
         AppKeyPair appKeys = new AppKeyPair(Constants.APP_KEY, Constants.APP_SECRET);
@@ -181,6 +231,10 @@ public class CameraActivity extends Activity {
     public void onStart() {
         super.onStart();
 
+        if (!resolvingError) {
+            googleApiClient.connect();
+        }
+
         // Start the thread that will upload the saved photos to Dropbox:
         dbUpldrThread = new DropboxUploaderThread(size, dropboxApi);
         dbUpldrThread.start();
@@ -189,15 +243,13 @@ public class CameraActivity extends Activity {
         photoProcsThread = new PhotoProcessorThread(this, dbUpldrThread);
         photoProcsThread.start();
 
-        // Delay the start of photo taking:
-        handler.postDelayed(delayPhotoTakingRunnable, delay);
+        if (intervalType == INTERVAL_TYPE_TIME) {
+            // Delay the start of photo taking:
+            handler.postDelayed(delayPhotoTakingRunnable, delay);
+        }
 
         // Start listening for rotation changes:
         orientationListener.enable();
-
-        // Start listening for location updates:
-        locationProvider.addOnLocationUpdateListener(onLocationUpdateListener);
-        locationProvider.create();
     }
 
     /**
@@ -224,11 +276,154 @@ public class CameraActivity extends Activity {
         // Stop listening for rotation changes:
         orientationListener.disable();
 
-        // Stop listening for location updates:
-        locationProvider.removeOnLocationUpdateListener(onLocationUpdateListener);
-        locationProvider.destroy();
+        if(googleApiClient.isConnected()){
+            LocationServices.FusedLocationApi.removeLocationUpdates(googleApiClient, locationListener);
+        }
 
+        googleApiClient.disconnect();
         super.onStop();
+    }
+
+    /**
+     * Called by the system before the activity may be killed so that when it comes back some time
+     * in the future it can restore its state.
+     *
+     * @param outState Bundle in which the state is saved.
+     */
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putBoolean(STATE_RESOLVING_ERROR, resolvingError);
+    }
+
+    /**
+     * Called when an activity launched by this activity exits, giving us the requestCode we started
+     * it with, the resultCode it returned, and any additional data from it. The resultCode will be
+     * RESULT_CANCELED if the activity explicitly returned that, didn't return any result, or
+     * crashed during its operation.
+     *
+     * @param requestCode The integer request code originally supplied to startActivityForResult(),
+     *                    allowing us to identify who this result came from.
+     * @param resultCode  The integer result code returned by the child activity through its
+     *                    setResult().
+     * @param data        An Intent, which can return result data to the caller.
+     */
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQUEST_RESOLVE_ERROR) {
+            resolvingError = false;
+            if (resultCode == RESULT_OK) {
+                // Make sure the app is not already connected or attempting to connect:
+                if (!googleApiClient.isConnecting() && !googleApiClient.isConnected()) {
+                    googleApiClient.connect();
+                }
+            }
+        }
+    }
+
+    /**
+     * After calling connect() on GoogleApiClient, this method will be invoked asynchronously when
+     * the connect request has successfully completed.
+     *
+     * @param bundle Bundle of data provided to clients by Google Play services. May be null if no
+     *               content is provided by the service.
+     */
+    @Override
+    public void onConnected(Bundle bundle) {
+        lastLocation = LocationServices.FusedLocationApi.getLastLocation(googleApiClient);
+        if (lastLocation != null) {
+            cameraView.setGeoTaggingLocation(lastLocation);
+        }
+        updateShownLocationDataHelper();
+
+        // Request location updates from Google Play Services Fused Provider:
+        if (intervalType == INTERVAL_TYPE_DISTANCE) {
+            LocationRequest locationRequest = new LocationRequest();
+            locationRequest.setInterval(1000L);
+            locationRequest.setFastestInterval(1000L);
+            locationRequest.setSmallestDisplacement(interval);
+            locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+            LocationServices.FusedLocationApi.requestLocationUpdates(googleApiClient, locationRequest, locationListener);
+        } else {
+            LocationRequest locationRequest = new LocationRequest();
+            locationRequest.setInterval(1000L);
+            locationRequest.setFastestInterval(1000L);
+            locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+            LocationServices.FusedLocationApi.requestLocationUpdates(googleApiClient, locationRequest, locationListener);
+        }
+    }
+
+    /**
+     * Called when the Google Play Services client is temporarily in a disconnected state.
+     *
+     * @param i The reason for the disconnection.
+     */
+    @Override
+    public void onConnectionSuspended(int i) {
+
+    }
+
+    /**
+     * Called when there was an error connecting the Google Play Services client to the service.
+     *
+     * @param connectionResult A ConnectionResult that can be used for resolving the error, and
+     *                         deciding what sort of error occurred.
+     */
+    @Override
+    public void onConnectionFailed(ConnectionResult connectionResult) {
+        if (resolvingError) {
+            // Already attempting to resolve an error.
+            return;
+        } else if (connectionResult.hasResolution()) {
+            try {
+                resolvingError = true;
+                connectionResult.startResolutionForResult(this, REQUEST_RESOLVE_ERROR);
+            } catch (IntentSender.SendIntentException e) {
+                // There was an error with the resolution intent. Try again.
+                googleApiClient.connect();
+            }
+        } else {
+            // Show dialog using GooglePlayServicesUtil.getErrorDialog():
+            // Create a fragment for the error dialog:
+            ErrorDialogFragment dialogFragment = new ErrorDialogFragment();
+            // Pass the error that should be displayed:
+            Bundle args = new Bundle();
+            args.putInt(DIALOG_ERROR, connectionResult.getErrorCode());
+            dialogFragment.setArguments(args);
+            dialogFragment.show(getFragmentManager(), DIALOG_ERROR);
+            resolvingError = true;
+        }
+    }
+
+    /**
+     * A helper method that updates the on-screen filename of the last captured image in the GUI thread.
+     *
+     * @param filename of the last captured image.
+     */
+    public void postLastCapturedPhotoFilenameUpdate(final String filename) {
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                textViewPhoto.setText(Html.fromHtml(getString(R.string.activityCamera_textViewPhoto, filename)));
+            }
+        });
+    }
+
+    /**
+     * A helper method that updates the on-screen texts with new location data.
+     */
+    private void updateShownLocationDataHelper() {
+        if (lastLocation != null) {
+            double lat = lastLocation.getLatitude();
+            double lon = lastLocation.getLongitude();
+            double alt = lastLocation.getAltitude();
+            float spd = lastLocation.getSpeed();
+
+            textViewLat.setText(Html.fromHtml(getString(R.string.activityCamera_textViewLat, String.valueOf(lat))));
+            textViewLong.setText(Html.fromHtml(getString(R.string.activityCamera_textViewLong, String.valueOf(lon))));
+            textViewAlt.setText(Html.fromHtml(getString(R.string.activityCamera_textViewAlt, String.valueOf(Math.round(alt)))));
+            textViewSpd.setText(Html.fromHtml(getString(R.string.activityCamera_textViewSpd, String.valueOf(Math.round(spd)))));
+        }
     }
 
     /**
@@ -351,12 +546,13 @@ public class CameraActivity extends Activity {
             // Add the saved photo to the device gallery:
             try {
                 MediaStore.Images.Media.insertImage(getContentResolver(), filePath, filename, getString(R.string.ppThread_photo_description));
-                Toast.makeText(getApplicationContext(), "Photo " + Integer.toString(photoCount++) + " saved", Toast.LENGTH_LONG).show();
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             }
             // Upload the saved photo to Dropbox:
             dbUpldrThread.queuePhoto(filePath);
+
+            postLastCapturedPhotoFilenameUpdate(filename);
 
             // 2) Send the captured photo data to another thread to save it on external storage:
 //            byte[] dataCopy = new byte[data.length];
@@ -366,8 +562,9 @@ public class CameraActivity extends Activity {
             // Restart camera preview:
             cameraView.restartPreview();
 
-            // If the activity is not being closed, schedule another photo capture:
-            if (!isFinishing()) {
+            // If the activity is not being closed and selected interval type is time,
+            // schedule another photo capture:
+            if (!isFinishing() && intervalType == INTERVAL_TYPE_TIME) {
                 long schdlNextPicIn = (takePicInvocTimestamp + interval) - SystemClock.elapsedRealtime();
                 Log.d(TAG, "pictureCallback.onPictureTaken() :: Current time is " + SystemClock.elapsedRealtime() + " schedule pic in " + schdlNextPicIn);
                 if (schdlNextPicIn < 1L) {
@@ -379,22 +576,66 @@ public class CameraActivity extends Activity {
     };
 
     /**
-     * An instance of the OnLocationUpdateListener interface which callback method is invoked by the
-     * underlying API when a new location fix is acquired.
+     * An instance of the LocationListener interface whose callback method is invoked by the
+     * Fused Provider API when a new location fix is acquired.
      */
-    private LocationProvider.OnLocationUpdateListener onLocationUpdateListener = new LocationProvider.OnLocationUpdateListener() {
+    private LocationListener locationListener = new LocationListener() {
 
         /**
          * A callback method that will be called to notify the listener that device location has
          * changed.
          *
-         * @param bestFixLocation The best possible location acquired from any of the registered
-         *                        providers.
+         * @param location Location acquired from any the Fused Provider.
          */
         @Override
-        public void onLocationUpdate(Location bestFixLocation) {
+        public void onLocationChanged(Location location) {
             // Update the location the camera uses to geo tag images:
-            cameraView.setGeoTaggingLocation(bestFixLocation);
+            Log.d(TAG, "locationListener.onLocationChanged() :: location = " + location);
+            updateShownLocationDataHelper();
+            if (intervalType == INTERVAL_TYPE_DISTANCE && location != null) {
+                if (lastLocation == null) {
+                    lastLocation = location;
+                    cameraView.setGeoTaggingLocation(location);
+
+                    takePicInvocTimestamp = SystemClock.elapsedRealtime();
+                    cameraView.takePicture(pictureCallback);
+                    devOrienAtCapture = devOrien;
+                } else {
+                    float distance = lastLocation.distanceTo(location);
+                    Log.d(TAG, "locationListener.onLocationChanged() :: distance = " + distance);
+
+                    if (distance >= interval) {
+                        lastLocation = location;
+                        cameraView.setGeoTaggingLocation(location);
+
+                        takePicInvocTimestamp = SystemClock.elapsedRealtime();
+                        cameraView.takePicture(pictureCallback);
+                        devOrienAtCapture = devOrien;
+                    }
+                }
+            } else {
+                lastLocation = location;
+                // Update the location the camera uses to geo tag images:
+                cameraView.setGeoTaggingLocation(location);
+            }
         }
     };
+
+    /**
+     * A fragment to display a Google Play Services error dialog.
+     */
+    public static class ErrorDialogFragment extends DialogFragment {
+
+        @Override
+        public Dialog onCreateDialog(Bundle savedInstanceState) {
+            // Get the error code and retrieve the appropriate dialog:
+            int errorCode = this.getArguments().getInt(DIALOG_ERROR);
+            return GooglePlayServicesUtil.getErrorDialog(errorCode, this.getActivity(), REQUEST_RESOLVE_ERROR);
+        }
+
+        @Override
+        public void onDismiss(DialogInterface dialog) {
+            ((CameraActivity) getActivity()).resolvingError = false;
+        }
+    }
 }
