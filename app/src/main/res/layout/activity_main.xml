@@ -27,12 +27,51 @@
                 android:text="@string/activityMain_photoInterval"
                 android:textAppearance="?android:attr/textAppearanceMedium" />
 
-            <Spinner
-                android:id="@+id/activityMain_spinnerInterval"
-                android:layout_width="110dip"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center_horizontal"
-                android:entries="@array/photo_interval" />
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <RadioButton
+                        android:id="@+id/activityMain_radioButtonTime"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/activityMain_time"
+                        android:checked="true" />
+
+                    <Spinner
+                        android:id="@+id/activityMain_spinnerIntervalTime"
+                        android:layout_width="110dip"
+                        android:layout_height="wrap_content"
+                        android:entries="@array/photo_interval_time" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <RadioButton
+                        android:id="@+id/activityMain_radioButtonDistance"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/activityMain_distance"
+                        android:checked="false" />
+
+                    <Spinner
+                        android:id="@+id/activityMain_spinnerIntervalDistance"
+                        android:layout_width="110dip"
+                        android:layout_height="wrap_content"
+                        android:entries="@array/photo_interval_distance" />
+                </LinearLayout>
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/textView2"
