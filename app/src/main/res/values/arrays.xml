@@ -2,26 +2,43 @@
 <resources>
 
     <!-- Values displayed to the user in the MainActivity's first spinner.
-    They represent the interval at which the app will take photos. -->
-    <string-array name="photo_interval">
+    They represent the interval in seconds at which the app will take photos. -->
+    <string-array name="photo_interval_time">
         <item>1 second</item>
         <item>2 seconds</item>
         <item>5 seconds</item>
         <item>10 seconds</item>
         <item>30 seconds</item>
         <item>60 seconds</item>
-        <item>120 seconds</item>
     </string-array>
 
-    <!-- The same values as in the photo_interval array just expressed in milliseconds and thus usable by the application.  -->
-    <integer-array name="photo_interval_values">
+    <!-- The same values as in the photo_interval_time array just expressed in milliseconds and thus usable by the application.  -->
+    <integer-array name="photo_interval_time_values">
         <item>1000</item>
         <item>2000</item>
         <item>5000</item>
         <item>10000</item>
         <item>30000</item>
         <item>60000</item>
-        <item>120000</item>
+    </integer-array>
+
+    <!-- Values displayed to the user in the MainActivity's first spinner.
+    They represent the distance interval at which the app will take photos. -->
+    <string-array name="photo_interval_distance">
+        <item>10m</item>
+        <item>25m</item>
+        <item>50m</item>
+        <item>100m</item>
+        <item>250m</item>
+    </string-array>
+
+    <!-- The same values as in the photo_interval_distance array just expressed in meters and thus usable by the application.  -->
+    <integer-array name="photo_interval_distance_values">
+        <item>10</item>
+        <item>25</item>
+        <item>50</item>
+        <item>100</item>
+        <item>250</item>
     </integer-array>
 
     <!-- Values displayed to the user in the MainActivity's second spinner.
