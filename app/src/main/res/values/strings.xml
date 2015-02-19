@@ -10,9 +10,16 @@
     <string name="activityMain_photoDelay">Delay:</string>
     <string name="activityMain_photoSize">Scale photo to:</string>
     <string name="activityMain_start">Start</string>
+    <string name="activityMain_time">Time\t\t</string>
+    <string name="activityMain_distance">Distance</string>
 
     <!-- Strings used in the CameraActivity: -->
     <string name="activityCamera_stop">Stop</string>
+    <string name="activityCamera_textViewLat">&lt;b>Latitude: &lt;/b>%1$s</string>
+    <string name="activityCamera_textViewLong">&lt;b>Longitude: &lt;/b>%1$s</string>
+    <string name="activityCamera_textViewAlt">&lt;b>Altitude: &lt;/b>%1$s m</string>
+    <string name="activityCamera_textViewSpd">&lt;b>Speed: &lt;/b>%1$s m&#47;s</string>
+    <string name="activityCamera_textViewPhoto">&lt;b>Latest photo: &lt;/b>%1$s</string>
 
     <!-- Strings used in the PhotoProcessorThread: -->
     <string name="ppThread_photo_description">A photo taken by DroidMapper</string>
