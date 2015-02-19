@@ -5,6 +5,10 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
+import android.hardware.Camera;
+import android.location.Location;
+import android.media.ExifInterface;
+import android.os.Build;
 import android.os.Environment;
 import android.os.SystemClock;
 import android.provider.MediaStore;
@@ -21,6 +25,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Locale;
 import java.util.Vector;
 
 /**
@@ -34,11 +39,12 @@ public class PhotoProcessorThread extends Thread {
 
     private static final String TAG = PhotoProcessorThread.class.getName();
 
+    private volatile Camera.Parameters camParams;
     private volatile boolean halt;
 
+    private final SimpleDateFormat dateFormat, exifGpsDateFormat, exifDateFormat;
     private final DropboxUploaderThread dbUpldrThread;
     private final ContentResolver contentResolver;
-    private final SimpleDateFormat dateFormat;
     private final String imgDescriptionTxt;
     private final Vector<JobStruct> queue;
     private final CameraActivity activity;
@@ -89,6 +95,9 @@ public class PhotoProcessorThread extends Thread {
         // Create a date format using which we will format photos timestamps and create their file
         // names:
         dateFormat = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss_SSS");
+        // And date formats for exif tags:
+        exifGpsDateFormat = new SimpleDateFormat("yyyy:MM:dd", Locale.ENGLISH);
+        exifDateFormat = new SimpleDateFormat("yyyy:MM:dd HH:mm:ss");
     }
 
     /**
@@ -157,6 +166,75 @@ public class PhotoProcessorThread extends Thread {
                     }
                 }
 
+                // Add EXIF data to the captured photo:
+                Date date = new Date();
+                try {
+                    ExifInterface exif = new ExifInterface(filePath);
+                    if (job.deviceLocation != null) {
+                        exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE, GpsUtil.convert(job.deviceLocation.getLatitude()));
+                        exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE_REF, GpsUtil.latitudeRef(job.deviceLocation.getLatitude()));
+                        exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, GpsUtil.convert(job.deviceLocation.getLongitude()));
+                        exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF, GpsUtil.longitudeRef(job.deviceLocation.getLongitude()));
+                        double alt = job.deviceLocation.getAltitude();
+                        if (alt >= 0) {
+                            exif.setAttribute(ExifInterface.TAG_GPS_ALTITUDE_REF, String.valueOf(0));
+                        } else {
+                            exif.setAttribute(ExifInterface.TAG_GPS_ALTITUDE_REF, String.valueOf(1));
+                        }
+                        exif.setAttribute(ExifInterface.TAG_GPS_ALTITUDE, String.valueOf(Math.round(alt)));
+                        exif.setAttribute(ExifInterface.TAG_GPS_DATESTAMP, exifGpsDateFormat.format(date));
+                        exif.setAttribute(ExifInterface.TAG_GPS_PROCESSING_METHOD, job.deviceLocation.getProvider());
+                    }
+
+                    exif.setAttribute(ExifInterface.TAG_IMAGE_WIDTH, String.valueOf(bfOptions.outWidth));
+                    exif.setAttribute(ExifInterface.TAG_IMAGE_LENGTH, String.valueOf(bfOptions.outHeight));
+                    exif.setAttribute(ExifInterface.TAG_DATETIME, exifDateFormat.format(date));
+                    exif.setAttribute(ExifInterface.TAG_MAKE, Build.MANUFACTURER);
+                    exif.setAttribute(ExifInterface.TAG_MODEL, Build.MODEL);
+
+//                    if(job.devOrienAtCapture == 0 || job.devOrienAtCapture == 360){
+//                        exif.setAttribute(ExifInterface.TAG_ORIENTATION, String.valueOf(ExifInterface.ORIENTATION_NORMAL));
+//                    } else if(job.devOrienAtCapture == 90){
+//                        exif.setAttribute(ExifInterface.TAG_ORIENTATION, String.valueOf(ExifInterface.ORIENTATION_ROTATE_90));
+//                    } else if(job.devOrienAtCapture == 180){
+//                        exif.setAttribute(ExifInterface.TAG_ORIENTATION, String.valueOf(ExifInterface.ORIENTATION_ROTATE_180));
+//                    } else if(job.devOrienAtCapture == 270){
+//                        exif.setAttribute(ExifInterface.TAG_ORIENTATION, String.valueOf(ExifInterface.ORIENTATION_ROTATE_270));
+//                    }
+
+                    if (camParams != null) {
+                        String fm = camParams.getFlashMode();
+                        if (fm == null || fm.equals(Camera.Parameters.FLASH_MODE_OFF)) {
+                            exif.setAttribute(ExifInterface.TAG_FLASH, String.valueOf(0));
+                        } else {
+                            exif.setAttribute(ExifInterface.TAG_FLASH, String.valueOf(0));
+                        }
+
+                        float fl = camParams.getFocalLength();
+                        exif.setAttribute(ExifInterface.TAG_FOCAL_LENGTH, String.valueOf(fl));
+
+                        String wb = camParams.getWhiteBalance();
+                        if (wb != null) {
+                            if (wb.equals(Camera.Parameters.WHITE_BALANCE_AUTO)) {
+                                exif.setAttribute(ExifInterface.TAG_WHITE_BALANCE, String.valueOf(ExifInterface.WHITEBALANCE_AUTO));
+                            } else {
+                                exif.setAttribute(ExifInterface.TAG_WHITE_BALANCE, String.valueOf(ExifInterface.WHITEBALANCE_MANUAL));
+                            }
+                        }
+
+                        String ap = camParams.get("aperture");
+                        if (ap != null) {
+                            exif.setAttribute(ExifInterface.TAG_APERTURE, ap);
+                        }
+                    }
+
+                    // TAG_EXPOSURE_TIME TAG_ISO
+
+                    exif.saveAttributes();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
                 // Add the saved photo to the device gallery:
                 try {
                     MediaStore.Images.Media.insertImage(contentResolver, filePath, filename, imgDescriptionTxt);
@@ -179,8 +257,9 @@ public class PhotoProcessorThread extends Thread {
      * @param data              Byte array containing the image data.
      * @param timestamp         System time at which the image was taken.
      * @param devOrienAtCapture Device orientation at the time the photo is taken.
+     * @param deviceLocation    Location at which the photo was captured.
      */
-    public void queuePhoto(byte[] data, long timestamp, int devOrienAtCapture) {
+    public void queuePhoto(byte[] data, long timestamp, int devOrienAtCapture, Location deviceLocation) {
         Log.d(TAG, "queuePhoto() :: Already in queue " + queue.size());
 
         // Don't let the queue have more than 3 photos to prevent out of memory exceptions:
@@ -189,7 +268,7 @@ public class PhotoProcessorThread extends Thread {
         }
 
         // Add the new photo to the queue:
-        queue.add(new JobStruct(data, timestamp, devOrienAtCapture));
+        queue.add(new JobStruct(data, timestamp, devOrienAtCapture, deviceLocation));
 
         // Notify the thread about this(it might be sleeping):
         synchronized (lock) {
@@ -212,11 +291,16 @@ public class PhotoProcessorThread extends Thread {
         }
     }
 
+    public void setCamParams(Camera.Parameters camParams) {
+        this.camParams = camParams;
+    }
+
     /**
      * A helper class used to hold photo timestamp and image data.
      */
     private class JobStruct {
 
+        private final Location deviceLocation;
         private final int devOrienAtCapture;
         private final long timestamp;
         private final byte[] data;
@@ -227,8 +311,10 @@ public class PhotoProcessorThread extends Thread {
          * @param data              Byte array containing the image data.
          * @param timestamp         System time at which the image was taken.
          * @param devOrienAtCapture Device orientation at the time the photo is taken.
+         * @param deviceLocation    Location at which the photo was captured
          */
-        public JobStruct(byte[] data, long timestamp, int devOrienAtCapture) {
+        public JobStruct(byte[] data, long timestamp, int devOrienAtCapture, Location deviceLocation) {
+            this.deviceLocation = deviceLocation;
             this.data = data;
             this.timestamp = timestamp;
             this.devOrienAtCapture = devOrienAtCapture;

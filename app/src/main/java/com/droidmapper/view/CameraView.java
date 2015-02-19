@@ -140,9 +140,9 @@ public class CameraView extends SurfaceView implements SurfaceHolder.Callback {
 
                 @Override
                 public int compare(Camera.Size lhs, Camera.Size rhs) {
-                    if(lhs.width < rhs.width){
+                    if (lhs.width < rhs.width) {
                         return -1;
-                    } else if(lhs.width > rhs.width){
+                    } else if (lhs.width > rhs.width) {
                         return 1;
                     }
                     return 0;
@@ -246,6 +246,10 @@ public class CameraView extends SurfaceView implements SurfaceHolder.Callback {
         if (!failedToConnectToCameraService) {
             camera.startPreview();
         }
+    }
+
+    public Camera.Parameters getCameraParams() {
+        return camera.getParameters();
     }
 
     /**

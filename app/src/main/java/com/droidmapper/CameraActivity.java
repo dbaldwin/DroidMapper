@@ -11,6 +11,8 @@ import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.hardware.Camera;
 import android.location.Location;
+import android.media.ExifInterface;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -35,7 +37,7 @@ import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 import com.droidmapper.util.Constants;
 import com.droidmapper.util.DropboxUploaderThread;
-import com.droidmapper.util.LocationProvider;
+import com.droidmapper.util.GpsUtil;
 import com.droidmapper.util.PhotoProcessorThread;
 import com.droidmapper.view.CameraView;
 
@@ -44,10 +46,9 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Locale;
 
 /**
  * This activity creates the camera screen GUI on the device's screen and handles user input. Its
@@ -95,11 +96,11 @@ public class CameraActivity extends Activity implements GoogleApiClient.Connecti
     private Location lastLocation;
 
     // Other:
+    private SimpleDateFormat dateFormat, exifGpsDateFormat, exifDateFormat;
     private OrientationEventListener orientationListener;
     private volatile long takePicInvocTimestamp;
     private int interval, intervalType, delay;
     private int devOrien, devOrienAtCapture;
-    private SimpleDateFormat dateFormat;
     private File mediaStorageDir;
     private Handler handler;
     private float size;
@@ -197,9 +198,12 @@ public class CameraActivity extends Activity implements GoogleApiClient.Connecti
         // Create a date format using which we will format photos timestamps and create their file
         // names:
         dateFormat = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss_SSS");
+        // And date formats for exif tags:
+        exifGpsDateFormat = new SimpleDateFormat("yyyy:MM:dd", Locale.ENGLISH);
+        exifDateFormat = new SimpleDateFormat("yyyy:MM:dd HH:mm:ss");
 
         // We need to listen for device orientation changes in order to know when it is held in
-        // portrait and when in landscape so that we can properly rotate the captured photos:
+        // portrait and when in landscape so that we could properly rotate the captured photos:
         orientationListener = new OrientationEventListener(this) {
 
             @Override
@@ -276,10 +280,9 @@ public class CameraActivity extends Activity implements GoogleApiClient.Connecti
         // Stop listening for rotation changes:
         orientationListener.disable();
 
-        if(googleApiClient.isConnected()){
+        if (googleApiClient.isConnected()) {
             LocationServices.FusedLocationApi.removeLocationUpdates(googleApiClient, locationListener);
         }
-
         googleApiClient.disconnect();
         super.onStop();
     }
@@ -346,8 +349,8 @@ public class CameraActivity extends Activity implements GoogleApiClient.Connecti
             LocationServices.FusedLocationApi.requestLocationUpdates(googleApiClient, locationRequest, locationListener);
         } else {
             LocationRequest locationRequest = new LocationRequest();
-            locationRequest.setInterval(1000L);
-            locationRequest.setFastestInterval(1000L);
+            locationRequest.setInterval(20000L);
+            locationRequest.setFastestInterval(10000L);
             locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
             LocationServices.FusedLocationApi.requestLocationUpdates(googleApiClient, locationRequest, locationListener);
         }
@@ -543,6 +546,73 @@ public class CameraActivity extends Activity implements GoogleApiClient.Connecti
                     }
                 }
             }
+            // Add EXIF data to the captured photo:
+            Date date = new Date();
+            try {
+                ExifInterface exif = new ExifInterface(filePath);
+                if (lastLocation != null) {
+                    exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE, GpsUtil.convert(lastLocation.getLatitude()));
+                    exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE_REF, GpsUtil.latitudeRef(lastLocation.getLatitude()));
+                    exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, GpsUtil.convert(lastLocation.getLongitude()));
+                    exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF, GpsUtil.longitudeRef(lastLocation.getLongitude()));
+                    double alt = lastLocation.getAltitude();
+                    if (alt >= 0) {
+                        exif.setAttribute(ExifInterface.TAG_GPS_ALTITUDE_REF, String.valueOf(0));
+                    } else {
+                        exif.setAttribute(ExifInterface.TAG_GPS_ALTITUDE_REF, String.valueOf(1));
+                    }
+                    exif.setAttribute(ExifInterface.TAG_GPS_ALTITUDE, String.valueOf(Math.round(alt)));
+                    exif.setAttribute(ExifInterface.TAG_GPS_DATESTAMP, exifGpsDateFormat.format(date));
+                    exif.setAttribute(ExifInterface.TAG_GPS_PROCESSING_METHOD, lastLocation.getProvider());
+                }
+
+                exif.setAttribute(ExifInterface.TAG_IMAGE_WIDTH, String.valueOf(bfOptions.outWidth));
+                exif.setAttribute(ExifInterface.TAG_IMAGE_LENGTH, String.valueOf(bfOptions.outHeight));
+                exif.setAttribute(ExifInterface.TAG_DATETIME, exifDateFormat.format(date));
+                exif.setAttribute(ExifInterface.TAG_MAKE, Build.MANUFACTURER);
+                exif.setAttribute(ExifInterface.TAG_MODEL, Build.MODEL);
+
+//                if(devOrienAtCapture == 0 || devOrienAtCapture == 360){
+//                    exif.setAttribute(ExifInterface.TAG_ORIENTATION, String.valueOf(ExifInterface.ORIENTATION_NORMAL));
+//                } else if(devOrienAtCapture == 90){
+//                    exif.setAttribute(ExifInterface.TAG_ORIENTATION, String.valueOf(ExifInterface.ORIENTATION_ROTATE_90));
+//                } else if(devOrienAtCapture == 180){
+//                    exif.setAttribute(ExifInterface.TAG_ORIENTATION, String.valueOf(ExifInterface.ORIENTATION_ROTATE_180));
+//                } else if(devOrienAtCapture == 270){
+//                    exif.setAttribute(ExifInterface.TAG_ORIENTATION, String.valueOf(ExifInterface.ORIENTATION_ROTATE_270));
+//                }
+
+                Camera.Parameters camParams = cameraView.getCameraParams();
+                String fm = camParams.getFlashMode();
+                if (fm == null || fm.equals(Camera.Parameters.FLASH_MODE_OFF)) {
+                    exif.setAttribute(ExifInterface.TAG_FLASH, String.valueOf(0));
+                } else {
+                    exif.setAttribute(ExifInterface.TAG_FLASH, String.valueOf(0));
+                }
+
+                float fl = camParams.getFocalLength();
+                exif.setAttribute(ExifInterface.TAG_FOCAL_LENGTH, String.valueOf(fl));
+
+                String wb = camParams.getWhiteBalance();
+                if (wb != null) {
+                    if (wb.equals(Camera.Parameters.WHITE_BALANCE_AUTO)) {
+                        exif.setAttribute(ExifInterface.TAG_WHITE_BALANCE, String.valueOf(ExifInterface.WHITEBALANCE_AUTO));
+                    } else {
+                        exif.setAttribute(ExifInterface.TAG_WHITE_BALANCE, String.valueOf(ExifInterface.WHITEBALANCE_MANUAL));
+                    }
+                }
+
+                String ap = camParams.get("aperture");
+                if (ap != null) {
+                    exif.setAttribute(ExifInterface.TAG_APERTURE, ap);
+                }
+
+                // TAG_EXPOSURE_TIME TAG_ISO
+
+                exif.saveAttributes();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
             // Add the saved photo to the device gallery:
             try {
                 MediaStore.Images.Media.insertImage(getContentResolver(), filePath, filename, getString(R.string.ppThread_photo_description));
@@ -555,9 +625,10 @@ public class CameraActivity extends Activity implements GoogleApiClient.Connecti
             postLastCapturedPhotoFilenameUpdate(filename);
 
             // 2) Send the captured photo data to another thread to save it on external storage:
+//            photoProcsThread.setCamParams(cameraView.getCameraParams());
 //            byte[] dataCopy = new byte[data.length];
 //            System.arraycopy(data, 0, dataCopy, 0, data.length);
-//            photoProcsThread.queuePhoto(dataCopy, System.currentTimeMillis(), devOrienAtCapture);
+//            photoProcsThread.queuePhoto(dataCopy, System.currentTimeMillis(), devOrienAtCapture, lastLocation);
 
             // Restart camera preview:
             cameraView.restartPreview();
