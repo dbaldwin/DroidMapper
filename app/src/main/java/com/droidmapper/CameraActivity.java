@@ -349,8 +349,8 @@ public class CameraActivity extends Activity implements GoogleApiClient.Connecti
             LocationServices.FusedLocationApi.requestLocationUpdates(googleApiClient, locationRequest, locationListener);
         } else {
             LocationRequest locationRequest = new LocationRequest();
-            locationRequest.setInterval(20000L);
-            locationRequest.setFastestInterval(10000L);
+            locationRequest.setInterval(1000L);
+            locationRequest.setFastestInterval(1000L);
             locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
             LocationServices.FusedLocationApi.requestLocationUpdates(googleApiClient, locationRequest, locationListener);
         }
@@ -565,7 +565,6 @@ public class CameraActivity extends Activity implements GoogleApiClient.Connecti
                     exif.setAttribute(ExifInterface.TAG_GPS_DATESTAMP, exifGpsDateFormat.format(date));
                     exif.setAttribute(ExifInterface.TAG_GPS_PROCESSING_METHOD, lastLocation.getProvider());
                 }
-
                 exif.setAttribute(ExifInterface.TAG_IMAGE_WIDTH, String.valueOf(bfOptions.outWidth));
                 exif.setAttribute(ExifInterface.TAG_IMAGE_LENGTH, String.valueOf(bfOptions.outHeight));
                 exif.setAttribute(ExifInterface.TAG_DATETIME, exifDateFormat.format(date));
