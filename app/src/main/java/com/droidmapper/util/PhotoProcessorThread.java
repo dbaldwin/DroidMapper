@@ -1,18 +1,16 @@
 package com.droidmapper.util;
 
 import android.content.ContentResolver;
-import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.hardware.Camera;
 import android.location.Location;
 import android.media.ExifInterface;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
-import android.os.SystemClock;
 import android.provider.MediaStore;
-import android.text.Html;
 import android.util.Log;
 
 import com.droidmapper.CameraActivity;
@@ -238,6 +236,11 @@ public class PhotoProcessorThread extends Thread {
                 // Add the saved photo to the device gallery:
                 try {
                     MediaStore.Images.Media.insertImage(contentResolver, filePath, filename, imgDescriptionTxt);
+                    String urlToAddedImage = MediaStore.Images.Media.insertImage(contentResolver, filePath, filename, imgDescriptionTxt);
+                    Log.d(TAG, "PhotoProcessorThread.run() :: urlToAddedImage = " + urlToAddedImage);
+                    String pathToAddedImage = Util.getFilePathFromUri(activity, Uri.parse(urlToAddedImage));
+                    Log.d(TAG, "PhotoProcessorThread.run() :: pathToAddedImage = " + pathToAddedImage);
+                    Util.copyExifTags(filePath, pathToAddedImage, bfOptions.outWidth, bfOptions.outHeight);
                 } catch (FileNotFoundException e) {
                     e.printStackTrace();
                 }

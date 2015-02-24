@@ -6,12 +6,14 @@ import android.app.DialogFragment;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentSender;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.hardware.Camera;
 import android.location.Location;
 import android.media.ExifInterface;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -39,6 +41,7 @@ import com.droidmapper.util.Constants;
 import com.droidmapper.util.DropboxUploaderThread;
 import com.droidmapper.util.GpsUtil;
 import com.droidmapper.util.PhotoProcessorThread;
+import com.droidmapper.util.Util;
 import com.droidmapper.view.CameraView;
 
 import java.io.ByteArrayOutputStream;
@@ -509,7 +512,7 @@ public class CameraActivity extends Activity implements GoogleApiClient.Connecti
             String filename = tsText + ".jpg";
             String filePath = mediaStorageDir.getPath() + File.separator + filename;
             File photoFile = new File(filePath);
-            // If needed fix the photo rotation:
+            // If needed, fix the photo rotation:
             BitmapFactory.Options bfOptions = new BitmapFactory.Options();
             bfOptions.inJustDecodeBounds = true;
             BitmapFactory.decodeByteArray(data, 0, data.length, bfOptions);
@@ -614,7 +617,11 @@ public class CameraActivity extends Activity implements GoogleApiClient.Connecti
             }
             // Add the saved photo to the device gallery:
             try {
-                MediaStore.Images.Media.insertImage(getContentResolver(), filePath, filename, getString(R.string.ppThread_photo_description));
+                String urlToAddedImage = MediaStore.Images.Media.insertImage(getContentResolver(), filePath, filename, getString(R.string.ppThread_photo_description));
+                Log.d(TAG, "pictureCallback.onPictureTaken() :: urlToAddedImage = " + urlToAddedImage);
+                String pathToAddedImage = Util.getFilePathFromUri(CameraActivity.this, Uri.parse(urlToAddedImage));
+                Log.d(TAG, "pictureCallback.onPictureTaken() :: pathToAddedImage = " + pathToAddedImage);
+                Util.copyExifTags(filePath, pathToAddedImage, bfOptions.outWidth, bfOptions.outHeight);
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             }

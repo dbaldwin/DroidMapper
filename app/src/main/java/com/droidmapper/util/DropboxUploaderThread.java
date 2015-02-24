@@ -136,7 +136,7 @@ public class DropboxUploaderThread extends Thread {
                         }
 
                         // Copy-paste exif tags:
-                        copyExifTagsHelper(job, tempFile.getPath(), scaled.getWidth(), scaled.getHeight());
+                        Util.copyExifTags(job, tempFile.getPath(), scaled.getWidth(), scaled.getHeight());
 
                         // Then upload it:
                         uploadFile(tempFile.getPath());
@@ -191,106 +191,6 @@ public class DropboxUploaderThread extends Thread {
         // Notify the thread about this(it might be sleeping):
         synchronized (lock) {
             lock.notifyAll();
-        }
-    }
-
-    /**
-     * A helper method that copies exif tag from the source image to the dest image.
-     *
-     * @param pathSource path to source image.
-     * @param pathDest   path to destination image.
-     */
-    private void copyExifTagsHelper(String pathSource, String pathDest, int destWidth, int destHeight) {
-        Log.d(TAG, "copyExifTagsHelper() :: pathSource = " + pathSource);
-        Log.d(TAG, "copyExifTagsHelper() :: pathDest = " + pathDest);
-        Log.d(TAG, "copyExifTagsHelper() :: destWidth = " + destWidth);
-        Log.d(TAG, "copyExifTagsHelper() :: destHeight = " + destHeight);
-        try {
-            ExifInterface exifSrc = new ExifInterface(pathSource);
-            ExifInterface exifDest = new ExifInterface(pathDest);
-
-            String val = exifSrc.getAttribute(ExifInterface.TAG_APERTURE);
-            if(val != null){
-                exifDest.setAttribute(ExifInterface.TAG_APERTURE, val);
-            }
-            val = exifSrc.getAttribute(ExifInterface.TAG_DATETIME);
-            if(val != null){
-                exifDest.setAttribute(ExifInterface.TAG_DATETIME, val);
-            }
-            val = exifSrc.getAttribute(ExifInterface.TAG_EXPOSURE_TIME);
-            if(val != null){
-                exifDest.setAttribute(ExifInterface.TAG_EXPOSURE_TIME, val);
-            }
-            val = exifSrc.getAttribute(ExifInterface.TAG_FLASH);
-            if(val != null){
-                exifDest.setAttribute(ExifInterface.TAG_FLASH, val);
-            }
-            val = exifSrc.getAttribute(ExifInterface.TAG_FOCAL_LENGTH);
-            if(val != null){
-                exifDest.setAttribute(ExifInterface.TAG_FOCAL_LENGTH, val);
-            }
-            val = exifSrc.getAttribute(ExifInterface.TAG_GPS_ALTITUDE);
-            if(val != null){
-                exifDest.setAttribute(ExifInterface.TAG_GPS_ALTITUDE, val);
-            }
-            val = exifSrc.getAttribute(ExifInterface.TAG_GPS_ALTITUDE_REF);
-            if(val != null){
-                exifDest.setAttribute(ExifInterface.TAG_GPS_ALTITUDE_REF, val);
-            }
-            val = exifSrc.getAttribute(ExifInterface.TAG_GPS_DATESTAMP);
-            if(val != null){
-                exifDest.setAttribute(ExifInterface.TAG_GPS_DATESTAMP, val);
-            }
-            val = exifSrc.getAttribute(ExifInterface.TAG_GPS_LATITUDE);
-            if(val != null){
-                exifDest.setAttribute(ExifInterface.TAG_GPS_LATITUDE, val);
-            }
-            val = exifSrc.getAttribute(ExifInterface.TAG_GPS_LATITUDE_REF);
-            if(val != null){
-                exifDest.setAttribute(ExifInterface.TAG_GPS_LATITUDE_REF, val);
-            }
-            val = exifSrc.getAttribute(ExifInterface.TAG_GPS_LONGITUDE);
-            if(val != null){
-                exifDest.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, val);
-            }
-            val = exifSrc.getAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF);
-            if(val != null){
-                exifDest.setAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF, val);
-            }
-            val = exifSrc.getAttribute(ExifInterface.TAG_GPS_PROCESSING_METHOD);
-            if(val != null){
-                exifDest.setAttribute(ExifInterface.TAG_GPS_PROCESSING_METHOD, val);
-            }
-            val = exifSrc.getAttribute(ExifInterface.TAG_GPS_TIMESTAMP);
-            if(val != null){
-                exifDest.setAttribute(ExifInterface.TAG_GPS_TIMESTAMP, val);
-            }
-            val = exifSrc.getAttribute(ExifInterface.TAG_ISO);
-            if(val != null){
-                exifDest.setAttribute(ExifInterface.TAG_ISO, val);
-            }
-            val = exifSrc.getAttribute(ExifInterface.TAG_MAKE);
-            if(val != null){
-                exifDest.setAttribute(ExifInterface.TAG_MAKE, val);
-            }
-            val = exifSrc.getAttribute(ExifInterface.TAG_MODEL);
-            if(val != null){
-                exifDest.setAttribute(ExifInterface.TAG_MODEL, val);
-            }
-            val = exifSrc.getAttribute(ExifInterface.TAG_ORIENTATION);
-            if(val != null){
-                exifDest.setAttribute(ExifInterface.TAG_ORIENTATION, val);
-            }
-            val = exifSrc.getAttribute(ExifInterface.TAG_WHITE_BALANCE);
-            if(val != null){
-                exifDest.setAttribute(ExifInterface.TAG_WHITE_BALANCE, val);
-            }
-            exifDest.setAttribute(ExifInterface.TAG_IMAGE_LENGTH, String.valueOf(destHeight));
-            exifDest.setAttribute(ExifInterface.TAG_IMAGE_WIDTH, String.valueOf(destWidth));
-
-            exifDest.saveAttributes();
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 
