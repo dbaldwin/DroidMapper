@@ -195,6 +195,7 @@ public class CameraView extends SurfaceView implements SurfaceHolder.Callback {
                 parameters.setPictureFormat(ImageFormat.JPEG);
                 parameters.setFlashMode(Camera.Parameters.FLASH_MODE_OFF);
                 parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_INFINITY);
+                parameters.setAntibanding(Camera.Parameters.ANTIBANDING_OFF);
                 parameters.setWhiteBalance(Camera.Parameters.WHITE_BALANCE_DAYLIGHT);
                 parameters.setSceneMode(Camera.Parameters.SCENE_MODE_AUTO);
                 parameters.setColorEffect(Camera.Parameters.EFFECT_NONE);
