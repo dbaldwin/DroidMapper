@@ -90,7 +90,7 @@ public class CameraActivity extends Activity implements GoogleApiClient.Connecti
     private String dbOauth2AccessToken;
 
     // Util threads:
-    private PhotoProcessorThread photoProcsThread;
+    //private PhotoProcessorThread photoProcsThread;
     private DropboxUploaderThread dbUpldrThread;
 
     // Location:
@@ -247,8 +247,8 @@ public class CameraActivity extends Activity implements GoogleApiClient.Connecti
         dbUpldrThread.start();
 
         // Start the thread that will save the photo data to external storage:
-        photoProcsThread = new PhotoProcessorThread(this, dbUpldrThread);
-        photoProcsThread.start();
+        //photoProcsThread = new PhotoProcessorThread(this, dbUpldrThread);
+        //photoProcsThread.start();
 
         if (intervalType == INTERVAL_TYPE_TIME) {
             // Delay the start of photo taking:
@@ -269,10 +269,10 @@ public class CameraActivity extends Activity implements GoogleApiClient.Connecti
         handler.removeCallbacks(delayPhotoTakingRunnable);
 
         // Stop the photo processor thread:
-        if (photoProcsThread != null) {
+        /*if (photoProcsThread != null) {
             photoProcsThread.halt();
             photoProcsThread = null;
-        }
+        }*/
 
         // Stop the Dropbox uploader thread:
         if (dbUpldrThread != null) {
@@ -573,16 +573,6 @@ public class CameraActivity extends Activity implements GoogleApiClient.Connecti
                 exif.setAttribute(ExifInterface.TAG_DATETIME, exifDateFormat.format(date));
                 exif.setAttribute(ExifInterface.TAG_MAKE, Build.MANUFACTURER);
                 exif.setAttribute(ExifInterface.TAG_MODEL, Build.MODEL);
-
-//                if(devOrienAtCapture == 0 || devOrienAtCapture == 360){
-//                    exif.setAttribute(ExifInterface.TAG_ORIENTATION, String.valueOf(ExifInterface.ORIENTATION_NORMAL));
-//                } else if(devOrienAtCapture == 90){
-//                    exif.setAttribute(ExifInterface.TAG_ORIENTATION, String.valueOf(ExifInterface.ORIENTATION_ROTATE_90));
-//                } else if(devOrienAtCapture == 180){
-//                    exif.setAttribute(ExifInterface.TAG_ORIENTATION, String.valueOf(ExifInterface.ORIENTATION_ROTATE_180));
-//                } else if(devOrienAtCapture == 270){
-//                    exif.setAttribute(ExifInterface.TAG_ORIENTATION, String.valueOf(ExifInterface.ORIENTATION_ROTATE_270));
-//                }
 
                 Camera.Parameters camParams = cameraView.getCameraParams();
                 String fm = camParams.getFlashMode();
