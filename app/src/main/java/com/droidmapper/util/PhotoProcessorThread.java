@@ -33,6 +33,7 @@ import java.util.Vector;
  * remaining queued tasks. If this is unwanted, because the app might/will lose a few photos, this
  * class should be modified to first finish queued tasks and then exit.
  */
+@Deprecated
 public class PhotoProcessorThread extends Thread {
 
     private static final String TAG = PhotoProcessorThread.class.getName();
